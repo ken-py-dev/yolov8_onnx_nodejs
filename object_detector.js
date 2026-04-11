@@ -1,4 +1,4 @@
-const ort = require("onnxruntime-node");
+const ort = require("onnxruntime-web");
 const express = require('express');
 const multer = require("multer");
 const sharp = require("sharp");
@@ -25,12 +25,32 @@ function main() {
      * an array of bounding boxes in format [[x1,y1,x2,y2,object_type,probability],..] as a JSON
      */
     app.post('/detect', upload.single('image_file'), async function (req, res) {
+        console.log("\n=== New Detection Request ===");
+        console.log(`File received: ${req.file.originalname}, size: ${req.file.size} bytes`);
+        
         const boxes = await detect_objects_on_image(req.file.buffer);
+        
+        console.log(`\n=== FINAL DETECTION RESULTS ===`);
+        console.log(`Total objects detected: ${boxes.length}`);
+        
+        if (boxes.length === 0) {
+            console.log("No objects detected (confidence < 0.5 or filtered by NMS)");
+        } else {
+            boxes.forEach((box, idx) => {
+                console.log(`\nObject ${idx + 1}:`);
+                console.log(`  - Label: ${box[4]}`);
+                console.log(`  - Confidence: ${(box[5] * 100).toFixed(2)}%`);
+                console.log(`  - Bounding Box: [x1: ${box[0].toFixed(2)}, y1: ${box[1].toFixed(2)}, x2: ${box[2].toFixed(2)}, y2: ${box[3].toFixed(2)}]`);
+            });
+        }
+        console.log("=== End of Results ===\n");
+        
         res.json(boxes);
     });
 
     app.listen(8080, () => {
-        console.log(`Server is listening on port 8080`)
+        console.log(`Server is listening on port 8080`);
+        console.log(`URL: http://localhost:8080`);
     });
 }
 
@@ -41,9 +61,18 @@ function main() {
  * @returns Array of bounding boxes in format [[x1,y1,x2,y2,object_type,probability],..]
  */
 async function detect_objects_on_image(buf) {
+    console.log("Preparing input image...");
     const [input,img_width,img_height] = await prepare_input(buf);
+    console.log(`Image prepared: original size ${img_width}x${img_height}`);
+    
+    console.log("Running model inference...");
     const output = await run_model(input);
-    return process_output(output,img_width,img_height);
+    console.log("Model inference completed");
+    
+    console.log("Processing output (filtering and NMS)...");
+    const results = process_output(output,img_width,img_height);
+    
+    return results;
 }
 
 /**
@@ -77,7 +106,10 @@ async function prepare_input(buf) {
  * @returns Raw output of neural network as a flat array of numbers
  */
 async function run_model(input) {
+    console.log("Loading ONNX model...");
     const model = await ort.InferenceSession.create("yolov8m.onnx");
+    console.log("Model loaded successfully");
+    
     input = new ort.Tensor(Float32Array.from(input),[1, 3, 640, 640]);
     const outputs = await model.run({images:input});
     return outputs["output0"].data;
@@ -93,31 +125,56 @@ async function run_model(input) {
  */
 function process_output(output, img_width, img_height) {
     let boxes = [];
+    let rawDetections = []; // Store raw detections before NMS for logging
+    
     for (let index=0;index<8400;index++) {
         const [class_id,prob] = [...Array(80).keys()]
             .map(col => [col, output[8400*(col+4)+index]])
             .reduce((accum, item) => item[1]>accum[1] ? item : accum,[0,0]);
-        if (prob < 0.5) {
-            continue;
+        
+        if (prob >= 0.5) {
+            const label = yolo_classes[class_id];
+            const xc = output[index];
+            const yc = output[8400+index];
+            const w = output[2*8400+index];
+            const h = output[3*8400+index];
+            const x1 = (xc-w/2)/640*img_width;
+            const y1 = (yc-h/2)/640*img_height;
+            const x2 = (xc+w/2)/640*img_width;
+            const y2 = (yc+h/2)/640*img_height;
+            
+            rawDetections.push({label, prob, x1, y1, x2, y2});
+            boxes.push([x1,y1,x2,y2,label,prob]);
         }
-        const label = yolo_classes[class_id];
-        const xc = output[index];
-        const yc = output[8400+index];
-        const w = output[2*8400+index];
-        const h = output[3*8400+index];
-        const x1 = (xc-w/2)/640*img_width;
-        const y1 = (yc-h/2)/640*img_height;
-        const x2 = (xc+w/2)/640*img_width;
-        const y2 = (yc+h/2)/640*img_height;
-        boxes.push([x1,y1,x2,y2,label,prob]);
     }
-
-    boxes = boxes.sort((box1,box2) => box2[5]-box1[5])
+    
+    // Log raw detections before NMS
+    console.log(`\n--- Raw detections (before NMS): ${rawDetections.length} objects with confidence >= 0.5 ---`);
+    if (rawDetections.length > 0) {
+        rawDetections.forEach((det, i) => {
+            console.log(`  ${i+1}. ${det.label} (${(det.prob * 100).toFixed(2)}%)`);
+        });
+    } else {
+        console.log("  No detections above threshold");
+    }
+    
+    // Sort by confidence
+    boxes = boxes.sort((box1,box2) => box2[5]-box1[5]);
+    
+    // Apply NMS
     const result = [];
-    while (boxes.length>0) {
+    while (boxes.length > 0) {
         result.push(boxes[0]);
-        boxes = boxes.filter(box => iou(boxes[0],box)<0.7);
+        boxes = boxes.filter(box => iou(boxes[0], box) < 0.7);
     }
+    
+    console.log(`\n--- After NMS (IoU threshold 0.7): ${result.length} objects retained ---`);
+    if (result.length > 0) {
+        result.forEach((det, i) => {
+            console.log(`  ${i+1}. ${det[4]} (${(det[5] * 100).toFixed(2)}%)`);
+        });
+    }
+    
     return result;
 }
 

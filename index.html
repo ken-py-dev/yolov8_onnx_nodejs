@@ -2,65 +2,799 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>YOLOv8 Object Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Object Detection - AI Vision</title>
     <style>
-      canvas {
-          display:block;
-          border: 1px solid black;
-          margin-top:10px;
-      }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            animation: fadeInDown 0.6s ease;
+        }
+
+        .header h1 {
+            font-size: clamp(1.8rem, 5vw, 2.5rem);
+            margin-bottom: 10px;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: clamp(0.9rem, 3vw, 1.1rem);
+            opacity: 0.95;
+        }
+
+        .mode-toggle {
+            background: white;
+            border-radius: 50px;
+            padding: 5px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: transparent;
+            color: #667eea;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .upload-area {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .upload-area:hover {
+            transform: translateY(-5px);
+        }
+
+        .upload-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .upload-label:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .upload-label:active {
+            transform: scale(0.98);
+        }
+
+        #uploadInput {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .camera-section {
+            display: none;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .camera-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        video.mirrored {
+            transform: scaleX(-1);
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .camera-switch {
+            background: white;
+            color: #667eea;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+            background: white;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .results {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .canvas-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow-x: auto;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            display: inline-block;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .stats {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .stats h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .detection-list {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+
+        .detection-list h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .list-items {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .detection-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: all 0.2s ease;
+        }
+
+        .detection-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .detection-label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .detection-confidence {
+            color: #667eea;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+            color: #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f56565 0%, #c53030 100%);
+            color: white;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .upload-area {
+                padding: 20px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .list-items {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
     </style>
 </head>
 <body>
-    <input id="uploadInput" type="file"/>
-    <canvas></canvas>
-    <script>
-      /**
-       * "Upload" button onClick handler: uploads selected image file
-       * to backend, receives array of detected objects
-       * and draws them on top of image
-       */
-       const input = document.getElementById("uploadInput");
-       input.addEventListener("change",async(event) => {
-           const data = new FormData();
-           data.append("image_file",event.target.files[0],"image_file");
-           const response = await fetch("/detect",{
-               method:"post",
-               body:data
-           });
-           const boxes = await response.json();
-           draw_image_and_boxes(event.target.files[0],boxes);
-       })
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Object Detection</h1>
+            <p>Upload image or take photo with camera</p>
+        </div>
 
-      /**
-       * Function draws the image from provided file
-       * and bounding boxes of detected objects on
-       * top of the image
-       * @param file Uploaded file object
-       * @param boxes Array of bounding boxes in format [[x1,y1,x2,y2,object_type,probability],...]
-       */
-      function draw_image_and_boxes(file,boxes) {
-          const img = new Image()
-          img.src = URL.createObjectURL(file);
-          img.onload = () => {
-              const canvas = document.querySelector("canvas");
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(img,0,0);
-              ctx.strokeStyle = "#00FF00";
-              ctx.lineWidth = 3;
-              ctx.font = "18px serif";
-              boxes.forEach(([x1,y1,x2,y2,label]) => {
-                  ctx.strokeRect(x1,y1,x2-x1,y2-y1);
-                  ctx.fillStyle = "#00ff00";
-                  const width = ctx.measureText(label).width;
-                  ctx.fillRect(x1,y1,width+10,25);
-                  ctx.fillStyle = "#000000";
-                  ctx.fillText(label, x1, y1+18);
-              });
-          }
-      }
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="switchMode('upload')">📤 Upload Image</button>
+            <button class="mode-btn" onclick="switchMode('camera')">📷 Take Photo</button>
+        </div>
+
+        <div id="uploadSection" class="upload-area">
+            <label for="uploadInput" class="upload-label">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+                Choose Image
+            </label>
+            <input id="uploadInput" type="file" accept="image/jpeg,image/png,image/jpg"/>
+            <div class="file-info">Supports JPG, PNG • Max 10MB</div>
+        </div>
+
+        <div id="cameraSection" class="camera-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+            </div>
+            <div class="camera-controls">
+                <button class="btn btn-primary" id="startCameraBtn" onclick="startCamera()">📷 Start Camera</button>
+                <button class="camera-switch" id="switchCameraBtn" onclick="switchCamera()" style="display: none;">🔄 Switch Camera</button>
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndDetect()" style="display: none;">📸 Take Photo</button>
+                <button class="btn btn-danger" id="stopCameraBtn" onclick="stopCamera()" style="display: none;">⏹️ Stop Camera</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analyzing image with AI...</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="canvas-container">
+                <canvas id="detectionCanvas"></canvas>
+            </div>
+
+            <div class="stats">
+                <h3>📊 Detection Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Objects</div>
+                        <div class="stat-value" id="totalObjects">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Unique Classes</div>
+                        <div class="stat-value" id="uniqueClasses">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Confidence Score</div>
+                        <div class="stat-value" id="avgConfidence">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detection-list">
+                <h3>📋 Detected Objects</h3>
+                <div class="list-items" id="detectionList"></div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn" onclick="resetApp()">🔄 New Image</button>
+                <button class="btn btn-primary" onclick="downloadImage()">💾 Download Result</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentImageFile = null;
+        let currentBoxes = [];
+        let currentMode = 'upload';
+        let mediaStream = null;
+        let currentFacingMode = 'environment';
+
+        const video = document.getElementById('video');
+
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            if (mode === 'upload') {
+                document.querySelector('.mode-toggle button:first-child').classList.add('active');
+                document.getElementById('uploadSection').style.display = 'block';
+                document.getElementById('cameraSection').classList.remove('active');
+                stopCamera();
+            } else {
+                document.querySelector('.mode-toggle button:last-child').classList.add('active');
+                document.getElementById('uploadSection').style.display = 'none';
+                document.getElementById('cameraSection').classList.add('active');
+            }
+            
+            document.getElementById('results').classList.remove('active');
+        }
+
+        async function startCamera() {
+            try {
+                if (mediaStream) {
+                    stopCamera();
+                }
+                
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: currentFacingMode,
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                video.srcObject = mediaStream;
+                
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+                
+                document.getElementById('startCameraBtn').style.display = 'none';
+                document.getElementById('switchCameraBtn').style.display = 'inline-block';
+                document.getElementById('captureBtn').style.display = 'inline-block';
+                document.getElementById('stopCameraBtn').style.display = 'inline-block';
+                
+                if (currentFacingMode === 'user') {
+                    video.classList.add('mirrored');
+                } else {
+                    video.classList.remove('mirrored');
+                }
+            } catch (error) {
+                console.error('Camera error:', error);
+                alert('Unable to access camera. Please check permissions.');
+            }
+        }
+
+        async function switchCamera() {
+            currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+            await startCamera();
+        }
+
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            video.srcObject = null;
+            document.getElementById('startCameraBtn').style.display = 'inline-block';
+            document.getElementById('switchCameraBtn').style.display = 'none';
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('stopCameraBtn').style.display = 'none';
+        }
+
+        async function captureAndDetect() {
+            if (!video.videoWidth || !video.videoHeight) {
+                alert('Please wait for camera to start');
+                return;
+            }
+            
+            const captureCanvas = document.createElement('canvas');
+            captureCanvas.width = video.videoWidth;
+            captureCanvas.height = video.videoHeight;
+            const captureCtx = captureCanvas.getContext('2d');
+            
+            if (currentFacingMode === 'user') {
+                captureCtx.translate(captureCanvas.width, 0);
+                captureCtx.scale(-1, 1);
+            }
+            captureCtx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+            
+            const blob = await new Promise(resolve => {
+                captureCanvas.toBlob(resolve, 'image/jpeg', 0.9);
+            });
+            
+            if (!blob || blob.size < 1000) {
+                alert('Failed to capture photo. Please try again.');
+                return;
+            }
+            
+            stopCamera();
+            
+            document.getElementById("loading").classList.add("active");
+            document.getElementById("results").classList.remove("active");
+            
+            const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            
+            const formData = new FormData();
+            formData.append('image_file', file);
+            
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) throw new Error('Detection failed');
+                
+                const boxes = await response.json();
+                
+                const displayCanvas = document.getElementById("detectionCanvas");
+                displayCanvas.width = captureCanvas.width;
+                displayCanvas.height = captureCanvas.height;
+                const displayCtx = displayCanvas.getContext('2d');
+                
+                displayCtx.drawImage(captureCanvas, 0, 0);
+                
+                displayCtx.strokeStyle = '#00FF00';
+                displayCtx.lineWidth = Math.max(2, Math.min(displayCanvas.width, displayCanvas.height) / 200);
+                displayCtx.font = `${Math.max(14, Math.min(displayCanvas.width, displayCanvas.height) / 30)}px "Segoe UI", Arial`;
+                
+                boxes.forEach(([x1, y1, x2, y2, label, probability]) => {
+                    const scaleX = displayCanvas.width / 640;
+                    const scaleY = displayCanvas.height / 640;
+                    const scaledX1 = x1 / scaleX;
+                    const scaledY1 = y1 / scaleY;
+                    const scaledX2 = x2 / scaleX;
+                    const scaledY2 = y2 / scaleY;
+                    
+                    displayCtx.strokeRect(scaledX1, scaledY1, scaledX2 - scaledX1, scaledY2 - scaledY1);
+                    
+                    displayCtx.fillStyle = '#00FF00';
+                    const text = `${label} (${Math.round(probability * 100)}%)`;
+                    const metrics = displayCtx.measureText(text);
+                    const textWidth = metrics.width + 10;
+                    const textHeight = parseInt(displayCtx.font) + 8;
+                    
+                    displayCtx.fillRect(scaledX1, scaledY1 - textHeight, textWidth, textHeight);
+                    
+                    displayCtx.fillStyle = '#000000';
+                    displayCtx.fillText(text, scaledX1 + 5, scaledY1 - 5);
+                    displayCtx.fillStyle = '#00FF00';
+                });
+                
+                currentBoxes = boxes;
+                updateStats(boxes);
+                updateDetectionList(boxes);
+                
+                document.getElementById("loading").classList.remove("active");
+                document.getElementById("results").classList.add("active");
+                
+            } catch (error) {
+                console.error('Detection error:', error);
+                document.getElementById("loading").classList.remove("active");
+                alert('Error processing photo. Please try again.');
+                startCamera();
+            }
+        }
+
+        const input = document.getElementById("uploadInput");
+        input.addEventListener("change", async (event) => {
+            if (!event.target.files[0]) return;
+            
+            currentImageFile = event.target.files[0];
+            
+            document.getElementById("loading").classList.add("active");
+            document.getElementById("results").classList.remove("active");
+            
+            const data = new FormData();
+            data.append("image_file", currentImageFile, "image_file");
+            
+            try {
+                const response = await fetch("/detect", {
+                    method: "post",
+                    body: data
+                });
+                
+                if (!response.ok) throw new Error("Detection failed");
+                
+                currentBoxes = await response.json();
+                drawImageAndBoxes(currentImageFile, currentBoxes);
+                updateStats(currentBoxes);
+                updateDetectionList(currentBoxes);
+                
+                document.getElementById("loading").classList.remove("active");
+                document.getElementById("results").classList.add("active");
+            } catch (error) {
+                console.error("Error:", error);
+                document.getElementById("loading").classList.remove("active");
+                alert("Error processing image. Please try again.");
+            }
+        });
+
+        function drawImageAndBoxes(file, boxes) {
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const canvas = document.getElementById("detectionCanvas");
+                const ctx = canvas.getContext("2d");
+                
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                ctx.strokeStyle = "#00FF00";
+                ctx.lineWidth = Math.max(2, Math.min(img.width, img.height) / 200);
+                ctx.font = `${Math.max(14, Math.min(img.width, img.height) / 30)}px "Segoe UI", Arial`;
+                
+                boxes.forEach(([x1, y1, x2, y2, label, probability]) => {
+                    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                    
+                    ctx.fillStyle = "#00FF00";
+                    const text = `${label} (${Math.round(probability * 100)}%)`;
+                    const metrics = ctx.measureText(text);
+                    const textWidth = metrics.width + 10;
+                    const textHeight = parseInt(ctx.font) + 8;
+                    
+                    ctx.fillRect(x1, y1 - textHeight, textWidth, textHeight);
+                    
+                    ctx.fillStyle = "#000000";
+                    ctx.fillText(text, x1 + 5, y1 - 5);
+                    ctx.fillStyle = "#00FF00";
+                });
+                
+                URL.revokeObjectURL(img.src);
+            };
+        }
+        
+        function updateStats(boxes) {
+            const total = boxes.length;
+            const uniqueClasses = new Set(boxes.map(b => b[4])).size;
+            const avgConfidence = boxes.reduce((sum, b) => sum + (b[5] || 0), 0) / (total || 1) * 100;
+            
+            document.getElementById("totalObjects").textContent = total;
+            document.getElementById("uniqueClasses").textContent = uniqueClasses;
+            document.getElementById("avgConfidence").textContent = avgConfidence.toFixed(1);
+        }
+        
+        function updateDetectionList(boxes) {
+            const container = document.getElementById("detectionList");
+            container.innerHTML = "";
+            
+            const grouped = {};
+            boxes.forEach(([x1, y1, x2, y2, label, probability]) => {
+                if (!grouped[label]) grouped[label] = [];
+                grouped[label].push(probability);
+            });
+            
+            Object.entries(grouped).sort().forEach(([label, probs]) => {
+                const count = probs.length;
+                const avgProb = (probs.reduce((a,b) => a + b, 0) / count * 100).toFixed(1);
+                
+                const item = document.createElement("div");
+                item.className = "detection-item";
+                item.innerHTML = `
+                    <div class="detection-label">🎯 ${label}</div>
+                    <div class="detection-confidence">Found ${count} time${count > 1 ? 's' : ''} • ${avgProb}% confidence</div>
+                `;
+                container.appendChild(item);
+            });
+        }
+        
+        function resetApp() {
+            currentImageFile = null;
+            currentBoxes = [];
+            document.getElementById("results").classList.remove("active");
+            if (currentMode === 'upload') {
+                document.getElementById("uploadInput").value = "";
+            } else {
+                startCamera();
+            }
+            const canvas = document.getElementById("detectionCanvas");
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        function downloadImage() {
+            const canvas = document.getElementById("detectionCanvas");
+            const link = document.createElement("a");
+            link.download = "detection_result.png";
+            link.href = canvas.toDataURL();
+            link.click();
+        }
     </script>
 </body>
 </html>
